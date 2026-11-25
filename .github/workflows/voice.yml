@@ -1,0 +1,36 @@
+name: VOICEVOX synthesis
+on:
+  push:
+    paths:
+      - '.github/workflows/voice.yml'
+      - 'generate.py'
+  workflow_dispatch:
+    inputs:
+      dialogue:
+        description: 'JSON array of role and text'
+        required: false
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start engine
+        run: docker run -d --name voicevox -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest
+      - name: Generate and validate
+        env:
+          DIALOGUE: ${{ inputs.dialogue }}
+        run: |
+          if [ -n "$DIALOGUE" ]; then
+            printf '%s' "$DIALOGUE" > dialogue.json
+          else
+            printf '%s' '[{"role":"Mio","text":"こんにちは。"},{"role":"Sora","text":"音声生成のテストです。"}]' > dialogue.json
+          fi
+          python3 generate.py dialogue.json
+      - name: Engine logs
+        if: failure()
+        run: docker logs voicevox
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voicevox-audio
+          path: audio/
